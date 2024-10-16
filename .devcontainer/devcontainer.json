@@ -11,12 +11,8 @@
         },
         "ghcr.io/jlaundry/devcontainer-features/azure-functions-core-tools:1": {
             "version": "latest"
-        },
-        "ghcr.io/rchaganti/vsc-devcontainer-features/azurebicep:1": {
-            "version": "latest"
         }
 	},
-
 	// Configure tool-specific properties.
 	"customizations": {
 		// Configure properties specific to VS Code.
@@ -26,7 +22,8 @@
 				"ms-python.python",
 				"summer.azure-event-hub-explorer",
 				"ms-vscode.azure-account",
-				"ms-azuretools.vscode-azurefunctions"
+				"ms-azuretools.vscode-azurefunctions",
+				"ms-azuretools.vscode-bicep"
 			]
 		}
 	},

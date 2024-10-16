@@ -91,6 +91,8 @@ We need to deploy both the infrastructure and the Azure Function App.
     ```bash
     make deploy-infra
     ```
+    # On Mac M1: 
+    # if error: PAL_SEHException: set env variable - export DOTNET_EnableWriteXorExecute=0 
 
 1. Publish the Azure Function App:
 

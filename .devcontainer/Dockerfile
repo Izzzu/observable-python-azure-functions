@@ -1,1 +1,1 @@
-FROM --platform=amd64 mcr.microsoft.com/devcontainers/python:0-3.9
+FROM --platform=linux/amd64 mcr.microsoft.com/devcontainers/python:0-3.9
