@@ -4,29 +4,40 @@ import datetime
 import logging
 
 import azure.functions as func
-from opencensus.extension.azure.functions import OpenCensusExtension
-from opencensus.trace import config_integration
+# from opencensus.extension.azure.functions import OpenCensusExtension
+# from opencensus.trace import config_integration
 from azure.cosmos import CosmosClient
 
-OpenCensusExtension.configure()
-config_integration.trace_integrations(['requests'])
-config_integration.trace_integrations(['logging'])
+# OpenCensusExtension.configure()
+# config_integration.trace_integrations(['requests'])
+# config_integration.trace_integrations(['logging'])
+from azure.monitor.opentelemetry import configure_azure_monitor
+from opentelemetry import trace
+from opentelemetry.propagate import extract
 
+configure_azure_monitor(connection_string=os.environ.get("APPSETTING_APPLICATIONINSIGHTS_CONNECTION_STRING", None))
 
+tracer = trace.get_tracer(__name__)
+
+@tracer.start_as_current_span("QueryStepFunction")
 def main(timer: func.TimerRequest, outputEventHubMessage: func.Out[str], context: func.Context) -> None:
     utc_timestamp = datetime.datetime.utcnow().replace(
         tzinfo=datetime.timezone.utc).isoformat()
 
+    # carrier = {
+    #   "traceparent": context.trace_context.Traceparent,
+    #   "tracestate": context.trace_context.Tracestate,
+    # }
+
     if timer.past_due:
         logging.info('The timer is past due!')
 
-
-    cosmos_connection_string = os.environ.get("ConnectionStrings:COSMOSDB_CONNECTION_STRING", None)
+    cosmos_connection_string = os.environ.get("DOCDBCONNSTR_COSMOSDB_CONNECTION_STRING", None)
     if not cosmos_connection_string:
-        raise ValueError("COSMOSDB_CONNECTION_STRING env variable not set")
+        raise ValueError("DOCDBCONNSTR_COSMOSDB_CONNECTION_STRING env variable not set")
     
     logging.info(f"Query Data Azure Function triggerred. Current tracecontext is: {context.trace_context.Traceparent}")
-    with context.tracer.span("queryExternalCatalog"):
+    with tracer.start_as_current_span("queryExternalCatalog"):
         logging.info('querying the external catalog')
 
         try:
@@ -39,11 +50,11 @@ def main(timer: func.TimerRequest, outputEventHubMessage: func.Out[str], context
             raise e
 
 
-    with context.tracer.span("sendMessage"):
+    with tracer.start_as_current_span("buildMessage"):
         logging.info('Building the events')
 
     try:
-        with context.tracer.span("splitToMessages"):
+        with tracer.start_as_current_span("splitToMessages"):
             # extract the "data" field form each document
             logging.info('Splitting to events')
             for d in docs_list:
@@ -54,13 +65,12 @@ def main(timer: func.TimerRequest, outputEventHubMessage: func.Out[str], context
 
             serialized_data_list = [json.dumps(d['data']) for d in docs_list]
 
-
-        with context.tracer.span("setMessages"): 
-            logging.info('Sending messages to Event Hub')
-            for d in serialized_data_list:
-                outputEventHubMessage.set(d)
+            with tracer.start_as_current_span("setMessages"): 
+                logging.info('Sending messages to Event Hub')
+                for d in serialized_data_list:
+                    outputEventHubMessage.set(d)
     except Exception as e:
-        logging.exception(e)
-        raise e
+            logging.exception(e)
+            raise e
 
     logging.info('Python timer trigger function ran at %s', utc_timestamp)

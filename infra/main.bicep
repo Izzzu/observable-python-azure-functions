@@ -63,6 +63,7 @@ resource cosmosAccount 'Microsoft.DocumentDB/databaseAccounts@2022-05-15' = {
   properties: {
     locations: failOverlocations
     databaseAccountOfferType: 'Standard'
+    disableLocalAuth: false 
   }
 }
 
@@ -248,18 +249,25 @@ resource functionApp 'Microsoft.Web/sites@2021-03-01' = {
         {
           name: 'EVENTHUBS_NS_CONNECTION_STRING'
           connectionString: eventHubNamespaceConnectionString
+          type: 'EventHub'
         }
         {
           name: 'SERVICEBUS_NS_CONNECTION_STRING'
           connectionString: serviceBusNamespaceConnectionString
+          type: 'ServiceBus'
         }
         {
           name: 'COSMOSDB_CONNECTION_STRING'
           connectionString: cosmosConnectionString
+          type: 'DocDb'
         }
 
       ]
       appSettings: [
+        {
+          name: 'EH_NS_CONNECTION_STRING'
+          value: eventHubNamespaceConnectionString
+        }
         {
           name: 'AzureWebJobsStorage'
           value: 'DefaultEndpointsProtocol=https;AccountName=${storageAccountName};EndpointSuffix=${environment().suffixes.storage};AccountKey=${storageAccount.listKeys().keys[0].value}'

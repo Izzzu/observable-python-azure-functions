@@ -6,7 +6,7 @@
       "name": "event",
       "direction": "in",
       "eventHubName": "ehub-onprem-ingestion",
-      "connection": "EVENTHUBS_NS_CONNECTION_STRING",
+      "connection": "EH_NS_CONNECTION_STRING",
       "consumerGroup": "$Default"
     },
     {
