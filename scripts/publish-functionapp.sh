@@ -45,7 +45,7 @@ azLogin
 
 pushd "${REPO_ROOT}" || return
   echo "Starting app publishing"
-  func azure functionapp publish "${function_app_name}"
+  func azure functionapp publish "${function_app_name}" --python
 popd || return
   
 
