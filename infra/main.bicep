@@ -42,6 +42,7 @@ var hostingPlanName = appName
 
 var cosmosAccountName  = 'cosmos-${suffix}'
 var storageAccountName = 'storage${suffix}'
+var storageBlobContainerName = 'storage${suffix}blob'
 
 
 var failOverlocations = [
@@ -114,7 +115,18 @@ resource storageAccount 'Microsoft.Storage/storageAccounts@2021-08-01' = {
     }
 }
 
+resource blobServices 'Microsoft.Storage/storageAccounts/blobServices@2023-01-01' = {
+  parent: storageAccount
+  name: 'default'
+}
 
+resource storageBlobContainer 'Microsoft.Storage/storageAccounts/blobServices/containers@2021-08-01' = {
+  name:storageBlobContainerName
+  parent: blobServices
+  properties: {
+    publicAccess: 'None'
+  }
+}
 
 
 // Creation of the Log-Analytics worksspace and the 
@@ -226,8 +238,8 @@ resource hostingPlan 'Microsoft.Web/serverfarms@2021-03-01' = {
   location: location
   kind: 'linux'
   sku: {
-    name: 'Y1'
-    tier: 'Dynamic'
+    tier: 'FlexConsumption'
+    name: 'FC1'
   }
   properties: {
     reserved: true
@@ -244,7 +256,6 @@ resource functionApp 'Microsoft.Web/sites@2021-03-01' = {
   properties: {
     serverFarmId: hostingPlan.id
     siteConfig: {
-      linuxFxVersion: 'python|3.9'
       connectionStrings: [
         {
           name: 'EVENTHUBS_NS_CONNECTION_STRING'
@@ -265,20 +276,20 @@ resource functionApp 'Microsoft.Web/sites@2021-03-01' = {
       ]
       appSettings: [
         {
+          name: 'DEPLOYMENT_STORAGE_CONNECTION_STRING'
+          value: 'DefaultEndpointsProtocol=https;AccountName=${storageAccountName};AccountKey=${listKeys(storageAccount.id,'2019-06-01').keys[0].value};EndpointSuffix=core.windows.net'
+        }
+        {
           name: 'EH_NS_CONNECTION_STRING'
           value: eventHubNamespaceConnectionString
         }
         {
+          name: 'SERVICEBUS_NS_CONNECTION_STRING'
+          value: serviceBusNamespaceConnectionString
+        }
+        {
           name: 'AzureWebJobsStorage'
           value: 'DefaultEndpointsProtocol=https;AccountName=${storageAccountName};EndpointSuffix=${environment().suffixes.storage};AccountKey=${storageAccount.listKeys().keys[0].value}'
-        }
-        {
-          name: 'WEBSITE_CONTENTAZUREFILECONNECTIONSTRING'
-          value: 'DefaultEndpointsProtocol=https;AccountName=${storageAccountName};EndpointSuffix=${environment().suffixes.storage};AccountKey=${storageAccount.listKeys().keys[0].value}'
-        }
-        {
-          name: 'WEBSITE_CONTENTSHARE'
-          value: toLower(functionAppName)
         }
         {
           name: 'FUNCTIONS_EXTENSION_VERSION'
@@ -289,10 +300,6 @@ resource functionApp 'Microsoft.Web/sites@2021-03-01' = {
           value: '1'
         }
         {
-          name: 'FUNCTIONS_WORKER_RUNTIME'
-          value: functionWorkerRuntime
-        }
-        {
           name: 'APPLICATIONINSIGHTS_CONNECTION_STRING'
           value: applicationInsights.properties.ConnectionString
         }
@@ -300,9 +307,30 @@ resource functionApp 'Microsoft.Web/sites@2021-03-01' = {
       ftpsState: 'FtpsOnly'
       minTlsVersion: '1.2'
     }
+    functionAppConfig: {
+      deployment: {
+        storage: {
+          type: 'blobContainer'
+          value: 'https://${storageAccountName}.blob.core.windows.net/${storageBlobContainerName}'
+          authentication: {
+            type: 'StorageAccountConnectionString'
+            storageAccountConnectionStringName: 'DEPLOYMENT_STORAGE_CONNECTION_STRING'
+          }
+        }
+      }
+      scaleAndConcurrency: {
+        maximumInstanceCount: 100
+        instanceMemoryMB: 2048
+      }
+      runtime: {
+        name: 'python'
+        version: '3.11'
+      }
+    }
     httpsOnly: true
   }
 }
+
 
 @description('This is the built-in Contributor role. See https://docs.microsoft.com/azure/role-based-access-control/built-in-roles#contributor')
 resource contributorRoleDefinition 'Microsoft.Authorization/roleDefinitions@2018-01-01-preview' existing = {
@@ -332,6 +360,17 @@ resource contributorRoleAssignmentCosmos 'Microsoft.Authorization/roleAssignment
 
   }
 }
+
+
+// resource functionAppRoleAssignment 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
+//   name: guid('fnapp', cosmosAccount.id, '00000000-0000-0000-0000-000000000002')
+//   scope: cosmosAccount
+//   properties: {
+//     roleDefinitionId: '00000000-0000-0000-0000-000000000002'
+//     principalId: functionApp.identity.principalId
+//     principalType: 'ServicePrincipal'
+//   }
+// }
 
 output cosmosConnectionString string = cosmosConnectionString
 output containerName string = containerName
